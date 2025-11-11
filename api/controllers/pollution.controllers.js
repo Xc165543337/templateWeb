@@ -4,20 +4,21 @@ const Pollution = db.pollution
 const Op = db.Sequelize.Op
 // Create and Save a new Pollution
 exports.create = (req, res) => {
-    if (!req.body.nom) {
-        res.status(400).send({ message: "Le champ 'nom' est requis." })
+    if (!req.body.titre) {
+        res.status(400).send({ message: "Le champ 'titre' est requis." })
         return
     }
 
     const pollution = {
-        nom: req.body.nom,
+        titre: req.body.titre,
         lieu: req.body.lieu,
         dateObservation: req.body.dateObservation ? new Date(req.body.dateObservation) : null,
-        typePollution: req.body.typePollution,
+        type: req.body.type,
         description: req.body.description,
         latitude: req.body.latitude,
         longitude: req.body.longitude,
-        imageUrl: req.body.imageUrl
+        niveau: req.body.niveau,
+        photoUrl: req.body.photoUrl
     }
 
     Pollution.create(pollution)
@@ -32,10 +33,10 @@ exports.create = (req, res) => {
 }
 
 // Retrieve all Pollutions from the database.
-// Optional query param: typePollution to filter by type
+// Optional query param: type to filter by type
 exports.findAll = (req, res) => {
-    const type = req.query.typePollution
-    const condition = type ? { typePollution: type } : null
+    const type = req.query.type
+    const condition = type ? { type } : null
 
     Pollution.findAll({ where: condition })
         .then(data => {

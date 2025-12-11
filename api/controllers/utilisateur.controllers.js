@@ -164,8 +164,6 @@ export const refreshToken = async (req, res) => {
         res.status(500).json({ message: err.message })
     }
 }
-    }
-}
 
 // Get current authenticated user from token
 export const me = async (req, res) => {

@@ -1,23 +1,24 @@
-const { Sequelize } = require ("sequelize");
-const { BDD }  = require ('../config');
-const sequelize = new Sequelize(`postgres://${BDD.user}:${BDD.password}@${BDD.host}/${BDD.bdname}`
-,{
+import { Sequelize } from 'sequelize'
+import { BDD } from '../config.js'
+import utilisateursModel from './utilisateurs.model.js'
+
+const sequelize = new Sequelize(`postgres://${BDD.user}:${BDD.password}@${BDD.host}/${BDD.bdname}`, {
     dialect: 'postgres',
     protocol: 'postgres',
     dialectOptions: {
-      ssl: true,
-      native:true
+        ssl: true,
+        native: true
     },
-    define:  {
-    	timestamps:false
+    define: {
+        timestamps: false
     }
-  });
+})
 
-const db = {};
+const db = {}
 
-db.Sequelize = Sequelize;
-db.sequelize = sequelize;
+db.Sequelize = Sequelize
+db.sequelize = sequelize
 
-db.utilisateurs = require("./utilisateurs.model.js")(sequelize, Sequelize);
+db.utilisateurs = utilisateursModel(sequelize, Sequelize)
 
-module.exports = db;
+export default db

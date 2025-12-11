@@ -1,37 +1,48 @@
-const jwt = require('jsonwebtoken');
-const { ACCESS_TOKEN_SECRET } = require("../config.js");
+import jwt from 'jsonwebtoken'
+import { ACCESS_TOKEN_SECRET } from '../config.js'
 
-module.exports = {
-     checkJwt : (req, res, next) => {
-    // Get the JWT from the request header.
-    const token = req.headers['authorization'];
-    let jwtPayload;
-  
-    // Validate the token and retrieve its data.
-    try {
-        // Verify the payload fields
-        let jwtBearer = token.split(' ')[1];
-        console.log ("Authorization: " + jwtBearer);
-        jwtPayload = jwt.verify(jwtBearer, ACCESS_TOKEN_SECRET ,
-        {
-          complete: true,
-          algorithms: ['HS256'],
-          clockTolerance: 0,
-          ignoreExpiration: false,
-          ignoreNotBefore: false
-      }
-        );
-        // Add the payload to the request so controllers may access it.
-        req.token = jwtPayload;
-    } catch (error) {
-       console.log (error);
-        res.status(401)
-            .type('json')
-            .send(JSON.stringify({ message: 'Missing or invalid token' }));
-        return;
+export const checkJwt = (req, res, next) => {
+    // Get the JWT from the request header
+    const authHeader = req.headers['authorization']
+
+    if (!authHeader) {
+        return res.status(401).json({ message: 'No authorization header provided' })
     }
-  
-    // Pass programmatic flow to the next middleware/controller.
-    next();
-  }
+
+    // Extract token from "Bearer <token>" format
+    const parts = authHeader.split(' ')
+    if (parts.length !== 2 || parts[0] !== 'Bearer') {
+        return res.status(401).json({ message: 'Invalid authorization header format. Use: Bearer <token>' })
+    }
+
+    const token = parts[1]
+
+    try {
+        // Verify the token
+        const decoded = jwt.verify(token, ACCESS_TOKEN_SECRET, {
+            algorithms: ['HS256']
+        })
+
+        // Ensure this is an access token, not a refresh token
+        if (decoded.type !== 'access') {
+            return res.status(401).json({ message: 'Invalid token type. Use access token.' })
+        }
+
+        // Add the decoded payload to the request so controllers may access it
+        req.user = decoded
+        req.token = token
+
+        next()
+    } catch (error) {
+        console.log('JWT verification error:', error.message)
+
+        if (error.name === 'TokenExpiredError') {
+            return res.status(401).json({ message: 'Token expired' })
+        }
+        if (error.name === 'JsonWebTokenError') {
+            return res.status(401).json({ message: 'Invalid token' })
+        }
+
+        return res.status(401).json({ message: 'Authentication failed' })
+    }
 }

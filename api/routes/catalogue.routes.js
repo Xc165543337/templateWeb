@@ -1,13 +1,13 @@
-const { checkJwt}  = require('./jwtMiddleware');
+import { Router } from 'express'
+import { checkJwt } from './jwtMiddleware.js'
+import * as catalogue from '../controllers/catalogue.controllers.js'
 
-module.exports = app => {
-    const catalogue = require("../controllers/catalogue.controllers.js");
-  
-    var router = require("express").Router();
-  
+const catalogueRoutes = app => {
+    const router = Router()
 
-   
-    router.get("/", checkJwt,catalogue.get);
-  
-    app.use('/api/catalogue', router);
-  };
+    router.get('/', checkJwt, catalogue.get)
+
+    app.use('/api/catalogue', router)
+}
+
+export default catalogueRoutes

@@ -1,43 +1,43 @@
-const express = require("express");
-const cors = require("cors");
+import express from 'express'
+import cors from 'cors'
+import db from './models/index.js'
+import routes from './routes/index.js'
+import { PORT } from './config.js'
 
-const app  = express ();
+const app = express()
 
-var corsOptions = {
-  origin: "*",
-  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-  headers: 'Content-Type, Authorization',
-  exposedHeaders:'Authorization'
-};
+const corsOptions = {
+    origin: '*',
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    headers: 'Content-Type, Authorization',
+    exposedHeaders: 'Authorization'
+}
 
-app.use(cors(corsOptions));
+app.use(cors(corsOptions))
 
 // parse requests of content-type - application/json
-app.use(express.json());
+app.use(express.json())
 
 // parse requests of content-type - application/x-www-form-urlencoded
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true }))
 
 // simple route
-app.get("/", (req, res) => {
-  res.json({ message: "Welcome to CNAM application." });
-});
+app.get('/', (req, res) => {
+    res.json({ message: 'Welcome to CNAM application.' })
+})
 
-const db = require("./models");
+db.sequelize
+    .sync()
+    .then(() => {
+        console.log('Synced db.')
+    })
+    .catch(err => {
+        console.log('Failed to sync db: ' + err.message)
+    })
 
-db.sequelize.sync()
-  .then(() => {
-    console.log("Synced db.");
-  })
-  .catch((err) => {
-    console.log("Failed to sync db: " + err.message);
-  });
-
-require("./routes")(app);
+routes(app)
 
 // set port, listen for requests
-const PORT =  443;
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}.`);
-});
-
+    console.log(`Server is running on port ${PORT}.`)
+})

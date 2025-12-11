@@ -1,10 +1,17 @@
-module.exports =  {
-    ACCESS_TOKEN_SECRET : "EMMA123",
-    BDD : {
-    "host" :"dpg-d1hnd1bipnbc73faldmg-a.oregon-postgres.render.com",
-    "port" : "5432",
-    "user" : "cnam_db_6xuy_user",
-    "password" : "fGkskYzc8Vwqho8X9bTXcnGq42q3X9bE",
-    "bdname" :"cnam_db_6xuy" 
-    }
+import 'dotenv/config'
+
+// JWT Configuration
+export const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET || 'fallback-access-secret-change-me'
+export const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || 'fallback-refresh-secret-change-me'
+export const ACCESS_TOKEN_EXPIRATION = process.env.ACCESS_TOKEN_EXPIRATION || '15m'
+export const REFRESH_TOKEN_EXPIRATION = process.env.REFRESH_TOKEN_EXPIRATION || '7d'
+
+export const BDD = {
+    host: process.env.DB_HOST || 'localhost',
+    port: process.env.DB_PORT || '5432',
+    user: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD || '',
+    bdname: process.env.DB_NAME || 'cnam'
 }
+
+export const PORT = process.env.PORT || 443

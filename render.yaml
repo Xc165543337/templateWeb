@@ -1,8 +1,26 @@
 services:
   - type: web
-    name: angular-node-monorepo
-    env: docker
-    dockerContext: .
-    plan: free
-    region: frankfurt
+    name: cnam-api
+    runtime: docker
+    repo: https://github.com/Xc165543337/templateWeb
+    branch: jwt
     dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: ACCESS_TOKEN_SECRET
+        sync: false
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: 5432
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_NAME
+        sync: false

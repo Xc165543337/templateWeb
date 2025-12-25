@@ -1,19 +1,18 @@
 import { Router } from 'express'
+import { checkJwt } from './jwtMiddleware.js'
 import * as pollution from '../controllers/pollution.controllers.js'
 
 const pollutionRoutes = app => {
     const router = Router()
 
-    // Create
-    router.post('/', pollution.create)
-    // Get all
+    // Public routes
     router.get('/', pollution.findAll)
-    // Get one
     router.get('/:id', pollution.findOne)
-    // Update
-    router.put('/:id', pollution.update)
-    // Delete
-    router.delete('/:id', pollution.deletePollution)
+
+    // Protected routes (auth required)
+    router.post('/', checkJwt, pollution.create)
+    router.put('/:id', checkJwt, pollution.update)
+    router.delete('/:id', checkJwt, pollution.deletePollution)
 
     app.use('/api/pollution', router)
 }

@@ -7,8 +7,9 @@ export const ACCESS_TOKEN_EXPIRATION = process.env.ACCESS_TOKEN_EXPIRATION || '1
 export const REFRESH_TOKEN_EXPIRATION = process.env.REFRESH_TOKEN_EXPIRATION || '7d'
 
 // Cookie Configuration
-export const COOKIE_SECURE = process.env.NODE_ENV === 'production' // HTTPS only in production
-export const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:3000' // Frontend origin
+export const COOKIE_SECURE = process.env.NODE_ENV === 'production' || process.env.COOKIE_SECURE === 'true'
+export const COOKIE_SAME_SITE = process.env.COOKIE_SAME_SITE || 'none' // 'none' for cross-site, 'strict' for same-site
+export const CORS_ORIGIN = process.env.CORS_ORIGIN || 'https://tp07-li-haoxuan.onrender.com' // Frontend origin
 
 export const BDD = {
     host: process.env.DB_HOST || 'localhost',

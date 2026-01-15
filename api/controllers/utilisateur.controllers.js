@@ -6,7 +6,8 @@ import {
     REFRESH_TOKEN_SECRET,
     ACCESS_TOKEN_EXPIRATION,
     REFRESH_TOKEN_EXPIRATION,
-    COOKIE_SECURE
+    COOKIE_SECURE,
+    COOKIE_SAME_SITE
 } from '../config.js'
 
 const Utilisateurs = db.utilisateurs
@@ -64,8 +65,8 @@ const generateTokens = user => {
 // Cookie options for refresh token (HttpOnly for XSS protection)
 const getRefreshTokenCookieOptions = () => ({
     httpOnly: true, // JavaScript can't access it (XSS protection)
-    secure: COOKIE_SECURE, // Only sent over HTTPS in production
-    sameSite: 'strict', // CSRF protection
+    secure: COOKIE_SECURE, // Required for sameSite: 'none' and HTTPS
+    sameSite: COOKIE_SAME_SITE, // 'none' for cross-site (different domains), 'strict' for same-site
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
     path: '/api/users' // Only sent to user-related endpoints
 })
@@ -140,7 +141,7 @@ export const logout = (req, res) => {
     res.clearCookie('refreshToken', {
         httpOnly: true,
         secure: COOKIE_SECURE,
-        sameSite: 'strict',
+        sameSite: COOKIE_SAME_SITE,
         path: '/api/users'
     })
     res.json({ message: 'Déconnexion réussie.' })

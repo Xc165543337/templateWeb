@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { checkJwt } from './jwtMiddleware.js'
+import { checkJwt, requireAdmin } from './jwtMiddleware.js'
 import * as utilisateur from '../controllers/utilisateur.controllers.js'
 
 const utilisateurRoutes = app => {
@@ -13,10 +13,13 @@ const utilisateurRoutes = app => {
 
     // Protected routes (auth required)
     router.get('/me', checkJwt, utilisateur.me)
-    router.get('/', checkJwt, utilisateur.findAll)
     router.get('/:id', checkJwt, utilisateur.findOne)
     router.put('/:id', checkJwt, utilisateur.update)
-    router.delete('/:id', checkJwt, utilisateur.deleteUser)
+    router.delete('/:id', checkJwt, utilisateur.deleteUser) // Self OR Admin
+
+    // Admin-only routes
+    router.get('/', checkJwt, requireAdmin, utilisateur.findAll) // List all users
+    router.patch('/:id/role', checkJwt, requireAdmin, utilisateur.updateRole) // Change user role
 
     app.use('/api/users', router)
 }

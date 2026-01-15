@@ -33,6 +33,14 @@ const utilisateursModel = (sequelize, Sequelize) => {
                 unique: true,
                 field: 'nom_utilisateur'
             },
+            role: {
+                type: Sequelize.STRING(10),
+                allowNull: false,
+                defaultValue: 'user',
+                validate: {
+                    isIn: [['user', 'admin']]
+                }
+            },
             dateCreation: {
                 type: Sequelize.DATE,
                 allowNull: true,

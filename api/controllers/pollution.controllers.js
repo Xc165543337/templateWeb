@@ -1,4 +1,3 @@
-import { v4 as uuidv4 } from 'uuid'
 import db from '../models/index.js'
 
 const Pollution = db.pollution
@@ -24,7 +23,7 @@ export const create = (req, res) => {
     }
 
     // Get user ID from JWT token (set by checkJwt middleware)
-    const utilisateurId = req.user?.userId
+    const utilisateurId = req.user?.id
     if (!utilisateurId) {
         res.status(401).send({ message: 'Utilisateur non authentifié.' })
         return
@@ -108,17 +107,21 @@ export const findOne = (req, res) => {
 // Update a Pollution by the id in the request
 export const update = async (req, res) => {
     const id = req.params.id
-    const utilisateurId = req.user?.userId
+    const requesterId = req.user?.id
+    const requesterRole = req.user?.role
 
     try {
-        // Check if pollution exists and belongs to the user
+        // Check if pollution exists
         const pollution = await Pollution.findByPk(id)
         if (!pollution) {
             return res.status(404).send({ message: `Signalement avec id=${id} introuvable.` })
         }
 
-        // Check ownership (user can only update their own pollution reports)
-        if (pollution.utilisateurId !== utilisateurId) {
+        // Check ownership OR admin role
+        const isOwner = pollution.utilisateurId === requesterId
+        const isAdmin = requesterRole === 'admin'
+
+        if (!isOwner && !isAdmin) {
             return res.status(403).send({ message: "Vous n'êtes pas autorisé à modifier ce signalement." })
         }
 
@@ -148,6 +151,7 @@ export const update = async (req, res) => {
             res.send({ message: 'Aucune modification effectuée.' })
         }
     } catch (err) {
+        console.error('Update pollution error:', err.message)
         res.status(500).send({ message: 'Erreur lors de la mise à jour du signalement avec id=' + id })
     }
 }
@@ -155,7 +159,8 @@ export const update = async (req, res) => {
 // Delete a Pollution with the specified id in the request
 export const deletePollution = async (req, res) => {
     const id = req.params.id
-    const utilisateurId = req.user?.userId
+    const requesterId = req.user?.id
+    const requesterRole = req.user?.role
 
     try {
         // Check if pollution exists
@@ -164,21 +169,25 @@ export const deletePollution = async (req, res) => {
             return res.status(404).send({ message: `Signalement avec id=${id} introuvable.` })
         }
 
-        // Check ownership (user can only delete their own pollution reports)
-        if (pollution.utilisateurId !== utilisateurId) {
+        // Check ownership OR admin role
+        const isOwner = pollution.utilisateurId === requesterId
+        const isAdmin = requesterRole === 'admin'
+
+        if (!isOwner && !isAdmin) {
             return res.status(403).send({ message: "Vous n'êtes pas autorisé à supprimer ce signalement." })
         }
 
         await Pollution.destroy({ where: { id: id } })
         res.send({ message: 'Signalement supprimé avec succès!' })
     } catch (err) {
+        console.error('Delete pollution error:', err.message)
         res.status(500).send({ message: 'Erreur lors de la suppression du signalement avec id=' + id })
     }
 }
 
 // Retrieve all Pollutions created by the authenticated user
 export const findMyPollutions = (req, res) => {
-    const utilisateurId = req.user?.userId
+    const utilisateurId = req.user?.id
 
     if (!utilisateurId) {
         return res.status(401).send({ message: 'Utilisateur non authentifié.' })

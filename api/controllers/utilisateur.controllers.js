@@ -27,6 +27,7 @@ const generateAccessToken = user => {
             id: user.id,
             email: user.email,
             nomUtilisateur: user.nomUtilisateur,
+            role: user.role,
             type: 'access'
         },
         ACCESS_TOKEN_SECRET,
@@ -91,13 +92,19 @@ export const register = async (req, res) => {
         if (existing) {
             return res.status(409).json({ message: 'Email ou nom utilisateur déjà utilisé.' })
         }
+
+        // First user becomes admin
+        const userCount = await Utilisateurs.count()
+        const role = userCount === 0 ? 'admin' : 'user'
+
         const hash = await bcrypt.hash(motDePasse, 10)
         const created = await Utilisateurs.create({
             nom,
             prenom,
             email,
             motDePasse: hash,
-            nomUtilisateur
+            nomUtilisateur,
+            role
         })
         res.status(201).json(sanitizeUser(created))
     } catch (err) {
@@ -256,13 +263,83 @@ export const update = async (req, res) => {
     }
 }
 
-// Delete user
+// Delete user (self OR admin, with cascade deletion of pollutions)
 export const deleteUser = async (req, res) => {
     try {
-        const id = req.params.id
-        const removed = await Utilisateurs.destroy({ where: { id } })
-        if (!removed) return res.status(404).json({ message: 'Utilisateur introuvable.' })
-        res.json({ message: 'Utilisateur supprimé.' })
+        const targetId = Number.parseInt(req.params.id)
+        const requesterId = req.user.id
+        const requesterRole = req.user.role
+
+        const isOwner = targetId === requesterId
+        const isAdmin = requesterRole === 'admin'
+
+        // Check permission: must be owner or admin
+        if (!isOwner && !isAdmin) {
+            return res.status(403).json({ message: 'Vous ne pouvez pas supprimer un autre utilisateur.' })
+        }
+
+        // Find target user
+        const targetUser = await Utilisateurs.findByPk(targetId)
+        if (!targetUser) {
+            return res.status(404).json({ message: 'Utilisateur introuvable.' })
+        }
+
+        // Prevent deleting the last admin
+        if (targetUser.role === 'admin') {
+            const adminCount = await Utilisateurs.count({ where: { role: 'admin' } })
+            if (adminCount <= 1) {
+                return res.status(400).json({ message: 'Impossible de supprimer le dernier administrateur.' })
+            }
+        }
+
+        // Cascade delete: remove user's pollution reports
+        const Pollution = db.pollution
+        await Pollution.destroy({ where: { utilisateurId: targetId } })
+
+        // Delete the user
+        await Utilisateurs.destroy({ where: { id: targetId } })
+
+        res.json({ message: 'Utilisateur et ses signalements supprimés.' })
+    } catch (err) {
+        res.status(500).json({ message: err.message })
+    }
+}
+
+// Update user role (admin only)
+export const updateRole = async (req, res) => {
+    try {
+        const targetId = Number.parseInt(req.params.id)
+        const { role } = req.body
+
+        // Validate role
+        if (!['user', 'admin'].includes(role)) {
+            return res.status(400).json({ message: "Rôle invalide. Utilisez 'user' ou 'admin'." })
+        }
+
+        // Find target user
+        const targetUser = await Utilisateurs.findByPk(targetId)
+        if (!targetUser) {
+            return res.status(404).json({ message: 'Utilisateur introuvable.' })
+        }
+
+        // Prevent admin from demoting themselves
+        if (targetId === req.user.id && role !== 'admin') {
+            return res.status(400).json({ message: 'Vous ne pouvez pas rétrograder votre propre compte.' })
+        }
+
+        // If demoting an admin, ensure it's not the last one
+        if (targetUser.role === 'admin' && role === 'user') {
+            const adminCount = await Utilisateurs.count({ where: { role: 'admin' } })
+            if (adminCount <= 1) {
+                return res.status(400).json({ message: 'Impossible de rétrograder le dernier administrateur.' })
+            }
+        }
+
+        // Update role
+        await Utilisateurs.update({ role, dateModification: new Date() }, { where: { id: targetId } })
+
+        const updatedUser = await Utilisateurs.findByPk(targetId)
+        res.json({ message: 'Rôle mis à jour.', user: sanitizeUser(updatedUser) })
     } catch (err) {
         res.status(500).json({ message: err.message })
     }

@@ -46,3 +46,32 @@ export const checkJwt = (req, res, next) => {
         return res.status(401).json({ message: 'Authentication failed' })
     }
 }
+
+// Middleware: Require admin role
+export const requireAdmin = (req, res, next) => {
+    if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Accès réservé aux administrateurs.' })
+    }
+    next()
+}
+
+// Middleware factory: Require owner or admin
+// getOwnerId is an async function that extracts the owner ID from the request
+export const requireOwnerOrAdmin = getOwnerId => {
+    return async (req, res, next) => {
+        try {
+            const ownerId = await getOwnerId(req)
+            const isOwner = req.user.id === ownerId
+            const isAdmin = req.user.role === 'admin'
+
+            if (isOwner || isAdmin) {
+                return next()
+            }
+
+            return res.status(403).json({ message: 'Accès refusé.' })
+        } catch (error) {
+            console.error('Permission check error:', error.message)
+            return res.status(500).json({ message: 'Erreur lors de la vérification des permissions.' })
+        }
+    }
+}

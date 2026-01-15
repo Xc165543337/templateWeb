@@ -1,19 +1,24 @@
 import express from 'express'
 import cors from 'cors'
+import cookieParser from 'cookie-parser'
 import db from './models/index.js'
 import routes from './routes/index.js'
-import { PORT } from './config.js'
+import { PORT, CORS_ORIGIN } from './config.js'
 
 const app = express()
 
 const corsOptions = {
-    origin: '*',
+    origin: CORS_ORIGIN,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    headers: 'Content-Type, Authorization',
-    exposedHeaders: 'Authorization'
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    exposedHeaders: ['Authorization'],
+    credentials: true // Required for cookies to be sent cross-origin
 }
 
 app.use(cors(corsOptions))
+
+// Parse cookies
+app.use(cookieParser())
 
 // parse requests of content-type - application/json
 app.use(express.json())

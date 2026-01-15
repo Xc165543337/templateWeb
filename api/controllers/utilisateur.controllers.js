@@ -5,7 +5,8 @@ import {
     ACCESS_TOKEN_SECRET,
     REFRESH_TOKEN_SECRET,
     ACCESS_TOKEN_EXPIRATION,
-    REFRESH_TOKEN_EXPIRATION
+    REFRESH_TOKEN_EXPIRATION,
+    COOKIE_SECURE
 } from '../config.js'
 
 const Utilisateurs = db.utilisateurs
@@ -60,6 +61,15 @@ const generateTokens = user => {
     }
 }
 
+// Cookie options for refresh token (HttpOnly for XSS protection)
+const getRefreshTokenCookieOptions = () => ({
+    httpOnly: true, // JavaScript can't access it (XSS protection)
+    secure: COOKIE_SECURE, // Only sent over HTTPS in production
+    sameSite: 'strict', // CSRF protection
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
+    path: '/api/users' // Only sent to user-related endpoints
+})
+
 // Register new user
 export const register = async (req, res) => {
     try {
@@ -111,22 +121,39 @@ export const login = async (req, res) => {
         // Generate access and refresh tokens
         const tokens = generateTokens(user)
 
+        // Set refresh token as HttpOnly cookie (NOT in response body)
+        res.cookie('refreshToken', tokens.refreshToken, getRefreshTokenCookieOptions())
+
+        // Only send access token in response body (no refresh token!)
         res.json({
             user: sanitizeUser(user),
-            ...tokens
+            accessToken: tokens.accessToken,
+            accessTokenExpiresIn: tokens.accessTokenExpiresIn
         })
     } catch (err) {
         res.status(500).json({ message: err.message })
     }
 }
 
-// Refresh access token using refresh token
+// Logout - clear the refresh token cookie
+export const logout = (req, res) => {
+    res.clearCookie('refreshToken', {
+        httpOnly: true,
+        secure: COOKIE_SECURE,
+        sameSite: 'strict',
+        path: '/api/users'
+    })
+    res.json({ message: 'Déconnexion réussie.' })
+}
+
+// Refresh access token using refresh token from HttpOnly cookie
 export const refreshToken = async (req, res) => {
     try {
-        const { refreshToken } = req.body
+        // Read refresh token from HttpOnly cookie (not request body)
+        const refreshToken = req.cookies.refreshToken
 
         if (!refreshToken) {
-            return res.status(400).json({ message: 'Refresh token requis.' })
+            return res.status(401).json({ message: 'Refresh token requis. Veuillez vous reconnecter.' })
         }
 
         // Verify the refresh token
@@ -156,9 +183,14 @@ export const refreshToken = async (req, res) => {
         // Generate new tokens
         const tokens = generateTokens(user)
 
+        // Set new refresh token as HttpOnly cookie
+        res.cookie('refreshToken', tokens.refreshToken, getRefreshTokenCookieOptions())
+
+        // Only send access token in response body
         res.json({
             user: sanitizeUser(user),
-            ...tokens
+            accessToken: tokens.accessToken,
+            accessTokenExpiresIn: tokens.accessTokenExpiresIn
         })
     } catch (err) {
         res.status(500).json({ message: err.message })

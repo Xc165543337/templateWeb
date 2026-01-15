@@ -8,7 +8,7 @@ const utilisateurRoutes = app => {
     // Public routes (no auth required)
     router.post('/register', utilisateur.register)
     router.post('/login', utilisateur.login)
-    router.post('/refresh', utilisateur.refreshToken)
+    router.post('/refresh-token', utilisateur.refreshToken)
     router.post('/logout', utilisateur.logout)
 
     // Protected routes (auth required)

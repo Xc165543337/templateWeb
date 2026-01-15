@@ -10,6 +10,7 @@ const pollutionRoutes = app => {
     router.get('/:id', pollution.findOne)
 
     // Protected routes (auth required)
+    router.get('/user/me', checkJwt, pollution.findMyPollutions) // Get current user's pollutions
     router.post('/', checkJwt, pollution.create)
     router.put('/:id', checkJwt, pollution.update)
     router.delete('/:id', checkJwt, pollution.deletePollution)

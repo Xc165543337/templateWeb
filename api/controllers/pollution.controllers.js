@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid'
 import db from '../models/index.js'
 
 const Pollution = db.pollution
+const Utilisateur = db.utilisateurs
 const Op = db.Sequelize.Op
 
 // Create and Save a new Pollution
@@ -11,25 +12,44 @@ export const create = (req, res) => {
         return
     }
 
+    // Validate location: must have either address OR GPS coordinates
+    const hasAddress = req.body.adresse && req.body.adresse.trim() !== ''
+    const hasGPS = req.body.latitude !== undefined && req.body.longitude !== undefined
+
+    if (!hasAddress && !hasGPS) {
+        res.status(400).send({
+            message: "Une localisation est requise: 'adresse' OU coordonnées GPS ('latitude' et 'longitude')."
+        })
+        return
+    }
+
+    // Get user ID from JWT token (set by checkJwt middleware)
+    const utilisateurId = req.user?.userId
+    if (!utilisateurId) {
+        res.status(401).send({ message: 'Utilisateur non authentifié.' })
+        return
+    }
+
     const pollution = {
         titre: req.body.titre,
-        lieu: req.body.lieu,
+        adresse: req.body.adresse || null,
         dateObservation: req.body.dateObservation ? new Date(req.body.dateObservation) : null,
         type: req.body.type,
         description: req.body.description,
-        latitude: req.body.latitude,
-        longitude: req.body.longitude,
+        latitude: hasGPS ? req.body.latitude : null,
+        longitude: hasGPS ? req.body.longitude : null,
         niveau: req.body.niveau,
-        photoUrl: req.body.photoUrl
+        photoUrl: req.body.photoUrl || null, // Can be a URL or path to uploaded file
+        utilisateurId: utilisateurId
     }
 
     Pollution.create(pollution)
         .then(data => {
-            res.send(data)
+            res.status(201).send(data)
         })
         .catch(err => {
             res.status(500).send({
-                message: err.message || 'Some error occurred while creating the Pollution.'
+                message: err.message || 'Une erreur est survenue lors de la création du signalement.'
             })
         })
 }
@@ -40,13 +60,22 @@ export const findAll = (req, res) => {
     const type = req.query.type
     const condition = type ? { type } : null
 
-    Pollution.findAll({ where: condition })
+    Pollution.findAll({
+        where: condition,
+        include: [
+            {
+                model: Utilisateur,
+                as: 'utilisateur',
+                attributes: ['id', 'nom', 'prenom', 'nomUtilisateur']
+            }
+        ]
+    })
         .then(data => {
             res.send(data)
         })
         .catch(err => {
             res.status(500).send({
-                message: err.message || 'Some error occurred while retrieving pollutions.'
+                message: err.message || 'Une erreur est survenue lors de la récupération des signalements.'
             })
         })
 }
@@ -55,51 +84,122 @@ export const findAll = (req, res) => {
 export const findOne = (req, res) => {
     const id = req.params.id
 
-    Pollution.findByPk(id)
+    Pollution.findByPk(id, {
+        include: [
+            {
+                model: Utilisateur,
+                as: 'utilisateur',
+                attributes: ['id', 'nom', 'prenom', 'nomUtilisateur']
+            }
+        ]
+    })
         .then(data => {
             if (data) {
                 res.send(data)
             } else {
-                res.status(404).send({ message: `Cannot find Pollution with id=${id}.` })
+                res.status(404).send({ message: `Signalement avec id=${id} introuvable.` })
             }
         })
         .catch(err => {
-            res.status(500).send({ message: 'Error retrieving Pollution with id=' + id })
+            res.status(500).send({ message: 'Erreur lors de la récupération du signalement avec id=' + id })
         })
 }
 
 // Update a Pollution by the id in the request
-export const update = (req, res) => {
+export const update = async (req, res) => {
     const id = req.params.id
+    const utilisateurId = req.user?.userId
 
-    Pollution.update(req.body, { where: { id: id } })
-        .then(num => {
-            if (num[0] === 1 || num === 1) {
-                res.send({ message: 'Pollution was updated successfully.' })
-            } else {
-                res.send({
-                    message: `Cannot update Pollution with id=${id}. Maybe Pollution was not found or req.body is empty!`
+    try {
+        // Check if pollution exists and belongs to the user
+        const pollution = await Pollution.findByPk(id)
+        if (!pollution) {
+            return res.status(404).send({ message: `Signalement avec id=${id} introuvable.` })
+        }
+
+        // Check ownership (user can only update their own pollution reports)
+        if (pollution.utilisateurId !== utilisateurId) {
+            return res.status(403).send({ message: "Vous n'êtes pas autorisé à modifier ce signalement." })
+        }
+
+        // Validate location if being updated
+        if (req.body.adresse !== undefined || req.body.latitude !== undefined || req.body.longitude !== undefined) {
+            const newAdresse = req.body.adresse !== undefined ? req.body.adresse : pollution.adresse
+            const newLatitude = req.body.latitude !== undefined ? req.body.latitude : pollution.latitude
+            const newLongitude = req.body.longitude !== undefined ? req.body.longitude : pollution.longitude
+
+            const hasAddress = newAdresse && newAdresse.trim() !== ''
+            const hasGPS = newLatitude !== null && newLongitude !== null
+
+            if (!hasAddress && !hasGPS) {
+                return res.status(400).send({
+                    message: "Une localisation est requise: 'adresse' OU coordonnées GPS ('latitude' et 'longitude')."
                 })
             }
-        })
-        .catch(err => {
-            res.status(500).send({ message: 'Error updating Pollution with id=' + id })
-        })
+        }
+
+        // Don't allow changing the owner
+        delete req.body.utilisateurId
+
+        const [updated] = await Pollution.update(req.body, { where: { id: id } })
+        if (updated) {
+            res.send({ message: 'Signalement mis à jour avec succès.' })
+        } else {
+            res.send({ message: 'Aucune modification effectuée.' })
+        }
+    } catch (err) {
+        res.status(500).send({ message: 'Erreur lors de la mise à jour du signalement avec id=' + id })
+    }
 }
 
 // Delete a Pollution with the specified id in the request
-export const deletePollution = (req, res) => {
+export const deletePollution = async (req, res) => {
     const id = req.params.id
+    const utilisateurId = req.user?.userId
 
-    Pollution.destroy({ where: { id: id } })
-        .then(num => {
-            if (num === 1) {
-                res.send({ message: 'Pollution was deleted successfully!' })
-            } else {
-                res.send({ message: `Cannot delete Pollution with id=${id}. Maybe Pollution was not found!` })
+    try {
+        // Check if pollution exists
+        const pollution = await Pollution.findByPk(id)
+        if (!pollution) {
+            return res.status(404).send({ message: `Signalement avec id=${id} introuvable.` })
+        }
+
+        // Check ownership (user can only delete their own pollution reports)
+        if (pollution.utilisateurId !== utilisateurId) {
+            return res.status(403).send({ message: "Vous n'êtes pas autorisé à supprimer ce signalement." })
+        }
+
+        await Pollution.destroy({ where: { id: id } })
+        res.send({ message: 'Signalement supprimé avec succès!' })
+    } catch (err) {
+        res.status(500).send({ message: 'Erreur lors de la suppression du signalement avec id=' + id })
+    }
+}
+
+// Retrieve all Pollutions created by the authenticated user
+export const findMyPollutions = (req, res) => {
+    const utilisateurId = req.user?.userId
+
+    if (!utilisateurId) {
+        return res.status(401).send({ message: 'Utilisateur non authentifié.' })
+    }
+
+    Pollution.findAll({
+        where: { utilisateurId: utilisateurId },
+        include: [
+            {
+                model: Utilisateur,
+                as: 'utilisateur',
+                attributes: ['id', 'nom', 'prenom', 'nomUtilisateur']
             }
+        ]
+    })
+        .then(data => {
+            res.send(data)
         })
         .catch(err => {
-            res.status(500).send({ message: 'Could not delete Pollution with id=' + id })
+            res.status(500).send({
+                message: err.message || 'Une erreur est survenue lors de la récupération de vos signalements.'
+            })
         })
 }

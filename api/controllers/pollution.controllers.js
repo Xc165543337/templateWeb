@@ -50,6 +50,8 @@ export const uploadPhoto = (req, res) => {
     if (!req.file) {
         return res.status(400).json({ message: 'Aucun fichier fourni.' })
     }
+    // uploadPhoto
+    console.log('UPLOAD:', req.file.path)
 
     const photoUrl = `/photos/${req.file.filename}`
 
@@ -65,6 +67,8 @@ export const getPhoto = async (req, res) => {
     }
 
     const resolvedPath = path.resolve(UPLOADS_DIR, filename)
+    // getPhoto
+    console.log('LOOKUP:', resolvedPath)
 
     if (!resolvedPath.startsWith(UPLOADS_DIR + path.sep)) {
         return res.status(403).json({ message: 'Accès interdit.' })

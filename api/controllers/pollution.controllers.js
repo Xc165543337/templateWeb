@@ -1,8 +1,76 @@
 import db from '../models/index.js'
+import multer from 'multer'
+import path from 'path'
+import fs from 'fs'
+import { fileURLToPath } from 'url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 const Pollution = db.pollution
 const Utilisateur = db.utilisateurs
 const Op = db.Sequelize.Op
+
+// Configure multer for photo uploads
+const UPLOADS_DIR = path.join(__dirname, '..', 'uploads')
+
+// Ensure uploads directory exists
+if (!fs.existsSync(UPLOADS_DIR)) {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true })
+}
+
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, UPLOADS_DIR)
+    },
+    filename: (req, file, cb) => {
+        // Generate unique filename: timestamp-randomstring.ext
+        const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`
+        const ext = path.extname(file.originalname).toLowerCase()
+        cb(null, `photo-${uniqueSuffix}${ext}`)
+    }
+})
+
+const fileFilter = (req, file, cb) => {
+    // Accept only image files
+    if (file.mimetype.startsWith('image/')) {
+        cb(null, true)
+    } else {
+        cb(new Error('Seules les images sont autorisées.'), false)
+    }
+}
+
+export const upload = multer({
+    storage,
+    fileFilter,
+    limits: {
+        fileSize: 5 * 1024 * 1024 // 5MB max
+    }
+})
+
+// Upload photo and return URL
+export const uploadPhoto = (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ message: 'Aucun fichier fourni.' })
+    }
+
+    // Return the accessible URL path
+    const photoUrl = `/uploads/${req.file.filename}`
+
+    res.status(201).json({ photoUrl })
+}
+
+// Delete uploaded photo (cleanup helper)
+export const deletePhoto = photoUrl => {
+    if (!photoUrl || !photoUrl.startsWith('/uploads/')) return
+
+    const filename = path.basename(photoUrl)
+    const filepath = path.join(UPLOADS_DIR, filename)
+
+    if (fs.existsSync(filepath)) {
+        fs.unlinkSync(filepath)
+    }
+}
 
 // Create and Save a new Pollution
 export const create = (req, res) => {

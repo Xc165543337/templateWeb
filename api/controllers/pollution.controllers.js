@@ -11,7 +11,7 @@ const Pollution = db.pollution
 const Utilisateur = db.utilisateurs
 const Op = db.Sequelize.Op
 
-export const UPLOADS_DIR = path.resolve(__dirname, '..', 'uploads')
+export const UPLOADS_DIR = path.resolve(process.cwd(), 'uploads')
 
 export const ALLOWED_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp'])
 
@@ -24,8 +24,7 @@ const storage = multer.diskStorage({
     },
     filename: (_req, file, cb) => {
         const ext = path.extname(file.originalname).toLowerCase()
-        const name = `photo-${crypto.randomUUID()}${ext}`
-        cb(null, name)
+        cb(null, `photo-${crypto.randomUUID()}${ext}`)
     }
 })
 

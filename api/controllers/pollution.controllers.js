@@ -11,64 +11,92 @@ const Pollution = db.pollution
 const Utilisateur = db.utilisateurs
 const Op = db.Sequelize.Op
 
-// Configure multer for photo uploads
-const UPLOADS_DIR = path.join(__dirname, '..', 'uploads')
+export const UPLOADS_DIR = path.resolve(__dirname, '..', 'uploads')
 
-// Ensure uploads directory exists
-if (!fs.existsSync(UPLOADS_DIR)) {
-    fs.mkdirSync(UPLOADS_DIR, { recursive: true })
-}
+export const ALLOWED_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp'])
+
+// Ensure uploads directory exists (startup only)
+fs.mkdirSync(UPLOADS_DIR, { recursive: true })
 
 const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
+    destination: (_req, _file, cb) => {
         cb(null, UPLOADS_DIR)
     },
-    filename: (req, file, cb) => {
-        // Generate unique filename: timestamp-randomstring.ext
-        const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`
+    filename: (_req, file, cb) => {
         const ext = path.extname(file.originalname).toLowerCase()
-        cb(null, `photo-${uniqueSuffix}${ext}`)
+        const name = `photo-${crypto.randomUUID()}${ext}`
+        cb(null, name)
     }
 })
 
-const fileFilter = (req, file, cb) => {
-    // Accept only image files
-    if (file.mimetype.startsWith('image/')) {
-        cb(null, true)
-    } else {
-        cb(new Error('Seules les images sont autorisées.'), false)
+const fileFilter = (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase()
+
+    if (file.mimetype.startsWith('image/') && ALLOWED_EXTENSIONS.has(ext)) {
+        return cb(null, true)
     }
+
+    cb(new multer.MulterError('LIMIT_UNEXPECTED_FILE', 'image'))
 }
 
 export const upload = multer({
     storage,
     fileFilter,
     limits: {
-        fileSize: 5 * 1024 * 1024 // 5MB max
+        fileSize: 5 * 1024 * 1024 // 5MB
     }
 })
 
-// Upload photo and return URL
 export const uploadPhoto = (req, res) => {
     if (!req.file) {
         return res.status(400).json({ message: 'Aucun fichier fourni.' })
     }
 
-    // Return the accessible URL path
-    const photoUrl = `/uploads/${req.file.filename}`
+    const photoUrl = `/photos/${req.file.filename}`
 
     res.status(201).json({ photoUrl })
 }
 
-// Delete uploaded photo (cleanup helper)
-export const deletePhoto = photoUrl => {
-    if (!photoUrl || !photoUrl.startsWith('/uploads/')) return
+export const getPhoto = async (req, res) => {
+    const filename = req.params.filename
+    const ext = path.extname(filename).toLowerCase()
+
+    if (!ALLOWED_EXTENSIONS.has(ext)) {
+        return res.status(403).json({ message: 'Type de fichier interdit.' })
+    }
+
+    const resolvedPath = path.resolve(UPLOADS_DIR, filename)
+
+    if (!resolvedPath.startsWith(UPLOADS_DIR + path.sep)) {
+        return res.status(403).json({ message: 'Accès interdit.' })
+    }
+
+    try {
+        await fs.access(resolvedPath)
+
+        res.sendFile(resolvedPath, {
+            headers: {
+                'X-Content-Type-Options': 'nosniff',
+                'Cache-Control': 'public, max-age=86400'
+            }
+        })
+    } catch {
+        res.status(404).json({ message: 'Fichier non trouvé.' })
+    }
+}
+
+export const deletePhotoByUrl = async photoUrl => {
+    if (!photoUrl?.startsWith('/photos/')) return
 
     const filename = path.basename(photoUrl)
-    const filepath = path.join(UPLOADS_DIR, filename)
+    const filepath = path.resolve(UPLOADS_DIR, filename)
 
-    if (fs.existsSync(filepath)) {
-        fs.unlinkSync(filepath)
+    if (!filepath.startsWith(UPLOADS_DIR + path.sep)) return
+
+    try {
+        await fs.unlink(filepath)
+    } catch {
+        // Ignore missing file
     }
 }
 

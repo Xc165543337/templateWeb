@@ -34,6 +34,13 @@ app.use(express.urlencoded({ extended: true }))
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 
+app.use((err, _req, res, next) => {
+    if (err instanceof multer.MulterError) {
+        return res.status(400).json({ message: err.message })
+    }
+    next(err)
+})
+
 // simple route
 app.get('/', (req, res) => {
     res.json({ message: 'Welcome to CNAM application.' })

@@ -1,5 +1,4 @@
 import { Router } from 'express'
-import multer from 'multer'
 import { checkJwt } from './jwtMiddleware.js'
 import * as pollution from '../controllers/pollution.controllers.js'
 
@@ -19,24 +18,12 @@ const pollutionRoutes = app => {
     // Photo upload route (auth required)
     // Receives: multipart/form-data with field name 'photo'
     // Returns: { photoUrl: "/uploads/filename.jpg" }
-    router.post(
-        '/upload-photo',
-        checkJwt,
-        (req, res, next) => {
-            pollution.upload.single('photo')(req, res, err => {
-                if (err instanceof multer.MulterError) {
-                    if (err.code === 'LIMIT_FILE_SIZE') {
-                        return res.status(400).json({ message: 'Fichier trop volumineux. Taille maximale: 5MB.' })
-                    }
-                    return res.status(400).json({ message: `Erreur upload: ${err.message}` })
-                } else if (err) {
-                    return res.status(400).json({ message: err.message })
-                }
-                next()
-            })
-        },
-        pollution.uploadPhoto
-    )
+    router.post('/upload-photo', checkJwt, pollution.upload.single('photo'), pollution.uploadPhoto)
+
+    router.delete('/delete-photo/:filename', checkJwt, pollution.deletePhotoByUrl)
+
+    // Photo get route (public)
+    router.get('/photos/:filename', pollution.getPhoto)
 
     app.use('/api/pollution', router)
 }

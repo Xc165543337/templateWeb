@@ -9,11 +9,12 @@ import { PORT, CORS_ORIGIN } from './config.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
+const allowedOrigins = CORS_ORIGIN.split(',')
 
 const app = express()
 
 const corsOptions = {
-    origin: CORS_ORIGIN,
+    origin: allowedOrigins,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     allowedHeaders: ['Content-Type', 'Authorization'],
     exposedHeaders: ['Authorization'],
